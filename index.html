@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>泰文單字學習卡</title>
+    <style>
+        :root {
+            --primary-color: #ff6b6b;
+            --bg-color: #f0f2f5;
+        }
+        body { 
+            font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; 
+            background: var(--bg-color); 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            padding: 20px; 
+            margin: 0;
+        }
+        h1 { color: #2c3e50; margin-bottom: 30px; }
+        
+        /* 字卡容器 */
+        #card-container { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); 
+            gap: 20px; 
+            width: 100%; 
+            max-width: 1200px; 
+        }
+
+        /* 單張字卡樣式 */
+        .card { 
+            background: white; 
+            border-radius: 20px; 
+            padding: 30px; 
+            box-shadow: 0 10px 20px rgba(0,0,0,0.05); 
+            text-align: center; 
+            transition: all 0.3s ease; 
+            cursor: pointer;
+            position: relative;
+            border: 2px solid transparent;
+        }
+        .card:hover { 
+            transform: translateY(-10px); 
+            box-shadow: 0 15px 30px rgba(0,0,0,0.1);
+            border-color: var(--primary-color);
+        }
+        
+        .lesson-tag { 
+            background: #ffeaa7;
+            color: #d63031;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8em; 
+            font-weight: bold;
+            display: inline-block;
+            margin-bottom: 15px;
+        }
+        
+        .thai-word { 
+            font-size: 2.8em; 
+            color: #2d3436; 
+            margin: 15px 0; 
+            font-family: 'Saramun', sans-serif; /* 泰文字體 */
+        }
+        
+        .chinese-define { 
+            font-size: 1.4em; 
+            color: #636e72; 
+            margin-bottom: 20px;
+        }
+
+        .audio-btn {
+            background: var(--primary-color);
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+            font-size: 1.2em;
+            transition: transform 0.1s;
+        }
+        .card:active .audio-btn { transform: scale(0.9); }
+        
+        .no-audio-msg {
+            font-size: 0.8em;
+            color: #b2bec3;
+            margin-top: 10px;
+        }
+
+        /* 載入中動畫 */
+        .loading { font-size: 1.2em; color: #666; margin-top: 100px; }
+    </style>
+</head>
+<body>
+
+    <h1>🇹🇭 泰文單字字卡</h1>
+    <div id="card-container" class="loading">正在連線至 Google 試算表...</div>
+
+    <script>
+        // 這是你剛剛部署好的 API 網址
+        const API_URL = 'https://script.google.com/macros/s/AKfycbxl8mlVqRYKtCqLQFX3uaY8VHsQRxClD5VJrKMlILGzN6sYsiyuCm5i_fe_YlYfrPBXPw/exec';
+
+        async function fetchWords() {
+            try {
+                const response = await fetch(API_URL);
+                const data = await response.json();
+                renderCards(data);
+            } catch (error) {
+                document.getElementById('card-container').innerHTML = '❌ 無法載入資料，請確認網際網路連線或 GAS 權限。';
+                console.error(error);
+            }
+        }
+
+        function renderCards(words) {
+            const container = document.getElementById('card-container');
+            container.innerHTML = '';
+            container.classList.remove('loading');
+
+            words.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                
+                // 點擊字卡播放聲音
+                card.onclick = () => playAudio(item.audioId, item.word);
+
+                card.innerHTML = `
+                    <div class="lesson-tag">L${item.lesson}</div>
+                    <div class="thai-word">${item.word}</div>
+                    <div class="chinese-define">${item.define}</div>
+                    ${item.audioId 
+                        ? `<div class="audio-btn">🔊</div>` 
+                        : `<div class="no-audio-msg">（暫無音檔）</div>`
+                    }
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function playAudio(id, word) {
+            if (!id) return;
+            
+            // 構造 Google Drive 直連連結
+            const audioUrl = `https://drive.google.com/uc?export=download&id=${id}`;
+            const audio = new Audio(audioUrl);
+            
+            audio.play().catch(e => {
+                console.error("播放失敗:", e);
+                alert(`無法播放「${word}」的音檔。請確認該檔案在 Google 雲端中已開啟「知道連結的人即可檢視」權限。`);
+            });
+        }
+
+        // 開始抓取資料
+        fetchWords();
+    </script>
+</body>
+</html>
