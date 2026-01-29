@@ -3,147 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>泰文單字字卡系統</title>
+    <title>泰文單字卡 - 極速版</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
-        :root {
-            --primary-color: #ff6b6b;
-            --secondary-color: #4ecdc4;
-            --bg-color: #f7f9fc;
-            --text-color: #2d3436;
-        }
-
-        body {
-            font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        h1 {
-            margin-bottom: 30px;
-            font-weight: 600;
-            color: #34495e;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
-        }
-
-        /* 容器佈局 */
-        #card-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 25px;
-            width: 100%;
-            max-width: 1200px;
-        }
-
-        /* 字卡樣式 */
-        .card {
-            background: white;
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.05);
-            text-align: center;
-            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            cursor: pointer;
-            border: 2px solid transparent;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            min-height: 200px;
-        }
-
-        .card:hover {
-            transform: translateY(-10px);
-            box-shadow: 0 15px 30px rgba(0,0,0,0.1);
-            border-color: var(--primary-color);
-        }
-
-        /* 課次標籤 */
-        .lesson-tag {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            background: #ffeaa7;
-            color: #d63031;
-            padding: 3px 10px;
-            border-radius: 12px;
-            font-size: 0.75em;
-            font-weight: bold;
-        }
-
-        /* 泰文單字 */
-        .thai-word {
-            font-size: 3em;
-            margin: 10px 0;
-            color: #2d3436;
-        }
-
-        /* 中文定義 */
-        .chinese-define {
-            font-size: 1.4em;
-            color: #636e72;
-            margin-bottom: 15px;
-        }
-
-        /* 播放按鈕圖示 */
-        .audio-icon {
-            font-size: 1.5em;
-            color: var(--primary-color);
-            opacity: 0.8;
-        }
-
-        .no-audio {
-            color: #dfe6e9;
-        }
-
-        /* 載入中狀態 */
-        .loading {
-            font-size: 1.2em;
-            color: #95a5a6;
-            margin-top: 100px;
-            text-align: center;
-        }
-
-        /* 手機版調整 */
-        @media (max-width: 600px) {
-            #card-container {
-                grid-template-columns: 1fr;
-            }
-        }
+        :root { --primary: #ff6b6b; --bg: #f8f9fa; }
+        body { font-family: 'PingFang TC', sans-serif; background: var(--bg); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        h1 { color: #2d3436; margin-bottom: 20px; }
+        #card-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; width: 100%; max-width: 1100px; }
+        .card { background: white; border-radius: 20px; padding: 25px; box-shadow: 0 8px 15px rgba(0,0,0,0.05); text-align: center; cursor: pointer; transition: 0.2s; position: relative; border: 2px solid transparent; -webkit-tap-highlight-color: transparent; }
+        .card:active { transform: scale(0.95); }
+        .card.playing { border-color: var(--primary); }
+        .thai-word { font-size: 2.5em; margin: 15px 0; color: #2d3436; }
+        .chinese-define { font-size: 1.2em; color: #636e72; }
+        .lesson-tag { position: absolute; top: 15px; right: 15px; background: #ffeaa7; color: #d63031; padding: 2px 8px; border-radius: 10px; font-size: 0.8em; font-weight: bold; }
+        .loading { margin-top: 100px; color: #999; }
     </style>
 </head>
 <body>
 
-    <h1>🇹🇭 泰文單字練習卡</h1>
-
-    <div id="card-container" class="loading">正在從雲端載入資料，請稍候...</div>
+    <h1>🇹🇭 泰文單字練習</h1>
+    <div id="card-container" class="loading">正在極速載入中...</div>
 
     <script>
-        // 你最新的 GAS 網址
-        const API_URL = 'https://script.google.com/macros/s/AKfycbzVWIaEc0iIyUmPCtSINomccg1xs7JrWcF829vF1vbzoi0h7jiaTMPdmAsPIxVtZBq0Ew/exec';
+        // 你提供的 CSV 網址
+        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSHyMhwwJ12txyfcuAao1MsSR2K2WM61nYGqmSs-ub4Nm8BXmSGtF8h2tOXGJpqIhgLeBV35Im6C8ua/pub?gid=0&single=true&output=csv';
 
-        async function fetchWords() {
-            try {
-                const response = await fetch(API_URL);
-                const data = await response.json();
-                
-                if (data.error) {
-                    throw new Error(data.error);
+        const audioPlayer = new Audio();
+
+        function init() {
+            Papa.parse(CSV_URL, {
+                download: true,
+                header: true, // 自動把試算表第一列標題當 key
+                skipEmptyLines: true,
+                complete: function(results) {
+                    renderCards(results.data);
+                },
+                error: function() {
+                    document.getElementById('card-container').innerHTML = "❌ 載入失敗，請確認網路連線。";
                 }
-                
-                renderCards(data);
-            } catch (error) {
-                document.getElementById('card-container').innerHTML = `
-                    <div style="color:red; padding:20px;">
-                        <h3>載入失敗</h3>
-                        <p>原因：${error.message}</p>
-                        <p>請檢查 GAS 部署是否設為「所有人」以及分頁名稱是否正確。</p>
-                    </div>`;
-                console.error('Fetch error:', error);
-            }
+            });
         }
 
         function renderCards(words) {
@@ -152,43 +50,41 @@
             container.classList.remove('loading');
 
             words.forEach(item => {
+                // 排除空行或標題不符的情況
+                if (!item.word) return;
+
                 const card = document.createElement('div');
                 card.className = 'card';
-                card.style.position = 'relative';
                 
-                // 點擊整張卡片即播放
-                card.onclick = () => playAudio(item.audioId, item.word);
+                // 播放邏輯
+                card.onclick = () => {
+                    if (item.audioURL && item.audioURL.trim() !== "") {
+                        // 移除其他卡片的播放狀態
+                        document.querySelectorAll('.card').forEach(c => c.classList.remove('playing'));
+                        card.classList.add('playing');
+                        
+                        audioPlayer.src = item.audioURL;
+                        audioPlayer.load();
+                        audioPlayer.play().catch(e => console.log("播放被攔截"));
+                    }
+                };
 
                 card.innerHTML = `
-                    <div class="lesson-tag">L${item.lesson || '??'}</div>
+                    <div class="lesson-tag">L${item.lesson || ''}</div>
                     <div class="thai-word">${item.word}</div>
                     <div class="chinese-define">${item.define}</div>
-                    <div class="audio-icon ${item.audioId ? '' : 'no-audio'}">
-                        ${item.audioId ? '🔊' : '🔇'}
-                    </div>
+                    <div style="margin-top:10px; opacity: ${item.audioURL ? 1 : 0.1}">🔊</div>
                 `;
                 container.appendChild(card);
             });
         }
 
-        function playAudio(id, word) {
-            if (!id) {
-                console.log('此單字暫無音檔 ID');
-                return;
-            }
-            
-            // Google Drive 直連播放網址
-            const audioUrl = `https://drive.google.com/uc?export=download&id=${id}`;
-            const audio = new Audio(audioUrl);
-            
-            audio.play().catch(e => {
-                console.error("播放失敗:", e);
-                alert(`無法播放「${word}」。請確認音檔已在雲端硬碟開啟「知道連結的人皆可檢視」權限。`);
-            });
-        }
+        // 當音檔播放結束，移除卡片高亮
+        audioPlayer.onended = () => {
+            document.querySelectorAll('.card').forEach(c => c.classList.remove('playing'));
+        };
 
-        // 初始化抓取資料
-        fetchWords();
+        init();
     </script>
 </body>
 </html>
