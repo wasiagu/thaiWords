@@ -3,45 +3,107 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>泰文單字卡 - 極速版</title>
+    <title>泰文單字卡 - 篩選優化版</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
-        :root { --primary: #ff6b6b; --bg: #f8f9fa; }
-        body { font-family: 'PingFang TC', sans-serif; background: var(--bg); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        h1 { color: #2d3436; margin-bottom: 20px; }
-        #card-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; width: 100%; max-width: 1100px; }
+        :root { --primary: #ff6b6b; --bg: #f8f9fa; --text: #2d3436; }
+        body { font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; background: var(--bg); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        
+        .filter-container { 
+            background: white; padding: 15px 25px; border-radius: 50px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 30px;
+            display: flex; gap: 15px; flex-wrap: wrap; justify-content: center;
+            position: sticky; top: 10px; z-index: 100;
+        }
+        
+        select { 
+            padding: 8px 15px; border-radius: 20px; border: 1px solid #ddd; 
+            outline: none; font-size: 0.9em; cursor: pointer; background: #fff;
+        }
+
+        #card-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; width: 100%; max-width: 1200px; }
+        
         .card { background: white; border-radius: 20px; padding: 25px; box-shadow: 0 8px 15px rgba(0,0,0,0.05); text-align: center; cursor: pointer; transition: 0.2s; position: relative; border: 2px solid transparent; -webkit-tap-highlight-color: transparent; }
-        .card:active { transform: scale(0.95); }
-        .card.playing { border-color: var(--primary); }
-        .thai-word { font-size: 2.5em; margin: 15px 0; color: #2d3436; }
-        .chinese-define { font-size: 1.2em; color: #636e72; }
-        .lesson-tag { position: absolute; top: 15px; right: 15px; background: #ffeaa7; color: #d63031; padding: 2px 8px; border-radius: 10px; font-size: 0.8em; font-weight: bold; }
+        .card:active { transform: scale(0.96); background-color: #fffafa; }
+        .card.playing { border-color: var(--primary); box-shadow: 0 0 15px rgba(255,107,107,0.2); }
+        
+        .lesson-tag { position: absolute; top: 15px; left: 15px; background: #ffeaa7; color: #d63031; padding: 2px 10px; border-radius: 12px; font-size: 0.8em; font-weight: bold; }
+        .type-tag { position: absolute; top: 15px; right: 15px; color: #b2bec3; font-size: 0.8em; font-weight: bold; }
+        
+        .thai-word { font-size: 2.8em; margin: 15px 0 5px 0; color: var(--text); font-weight: 600; }
+        .word-class { font-size: 0.9em; color: var(--primary); margin-bottom: 10px; font-style: italic; }
+        .chinese-define { font-size: 1.3em; color: #636e72; }
+        
         .loading { margin-top: 100px; color: #999; }
     </style>
 </head>
 <body>
 
     <h1>🇹🇭 泰文單字練習</h1>
-    <div id="card-container" class="loading">正在極速載入中...</div>
+
+    <div class="filter-container">
+        <select id="filter-lesson"><option value="">所有課程 (Lesson)</option></select>
+        <select id="filter-type"><option value="">所有類型 (Type)</option></select>
+        <select id="filter-class"><option value="">所有詞性 (Class)</option></select>
+    </div>
+
+    <div id="card-container" class="loading">正在載入單字庫...</div>
 
     <script>
-        // 你提供的 CSV 網址
         const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSHyMhwwJ12txyfcuAao1MsSR2K2WM61nYGqmSs-ub4Nm8BXmSGtF8h2tOXGJpqIhgLeBV35Im6C8ua/pub?gid=0&single=true&output=csv';
-
+        let allWords = [];
         const audioPlayer = new Audio();
 
         function init() {
             Papa.parse(CSV_URL, {
                 download: true,
-                header: true, // 自動把試算表第一列標題當 key
+                header: true, 
                 skipEmptyLines: true,
                 complete: function(results) {
-                    renderCards(results.data);
-                },
-                error: function() {
-                    document.getElementById('card-container').innerHTML = "❌ 載入失敗，請確認網路連線。";
+                    allWords = results.data.filter(item => item.word);
+                    setupFilters();
+                    renderCards(allWords);
                 }
             });
+        }
+
+        function setupFilters() {
+            const lessons = [...new Set(allWords.map(i => i.lesson))].sort();
+            const types = [...new Set(allWords.map(i => i.type))].sort();
+            const classes = [...new Set(allWords.map(i => i.class))].sort();
+
+            fillSelect('filter-lesson', lessons);
+            fillSelect('filter-type', types);
+            fillSelect('filter-class', classes);
+
+            // 綁定監聽事件
+            [ 'filter-lesson', 'filter-type', 'filter-class' ].forEach(id => {
+                document.getElementById(id).addEventListener('change', performFilter);
+            });
+        }
+
+        function fillSelect(id, items) {
+            const select = document.getElementById(id);
+            items.forEach(item => {
+                if(!item) return;
+                const opt = document.createElement('option');
+                opt.value = item;
+                opt.textContent = item;
+                select.appendChild(opt);
+            });
+        }
+
+        function performFilter() {
+            const l = document.getElementById('filter-lesson').value;
+            const t = document.getElementById('filter-type').value;
+            const c = document.getElementById('filter-class').value;
+
+            const filtered = allWords.filter(item => {
+                return (l === '' || item.lesson === l) &&
+                       (t === '' || item.type === t) &&
+                       (c === '' || item.class === c);
+            });
+            renderCards(filtered);
         }
 
         function renderCards(words) {
@@ -50,39 +112,30 @@
             container.classList.remove('loading');
 
             words.forEach(item => {
-                // 排除空行或標題不符的情況
-                if (!item.word) return;
-
                 const card = document.createElement('div');
                 card.className = 'card';
-                
-                // 播放邏輯
+                const hasAudio = item.audioURL && item.audioURL.trim() !== "";
+
                 card.onclick = () => {
-                    if (item.audioURL && item.audioURL.trim() !== "") {
-                        // 移除其他卡片的播放狀態
+                    if (hasAudio) {
                         document.querySelectorAll('.card').forEach(c => c.classList.remove('playing'));
                         card.classList.add('playing');
-                        
                         audioPlayer.src = item.audioURL;
-                        audioPlayer.load();
-                        audioPlayer.play().catch(e => console.log("播放被攔截"));
+                        audioPlayer.play().catch(e => console.log("Play blocked"));
                     }
                 };
 
                 card.innerHTML = `
-                    <div class="lesson-tag">L${item.lesson || ''}</div>
+                    <div class="lesson-tag">L${item.lesson || '?'}</div>
+                    <div class="type-tag">${item.type || ''}</div>
                     <div class="thai-word">${item.word}</div>
+                    <div class="word-class">${item.class ? '[ ' + item.class + ' ]' : ''}</div>
                     <div class="chinese-define">${item.define}</div>
-                    <div style="margin-top:10px; opacity: ${item.audioURL ? 1 : 0.1}">🔊</div>
+                    <div style="margin-top:10px; opacity: ${hasAudio ? 1 : 0.1}">🔊</div>
                 `;
                 container.appendChild(card);
             });
         }
-
-        // 當音檔播放結束，移除卡片高亮
-        audioPlayer.onended = () => {
-            document.querySelectorAll('.card').forEach(c => c.classList.remove('playing'));
-        };
 
         init();
     </script>
